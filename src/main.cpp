@@ -193,19 +193,13 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info) {
             // pinging the PPP gateway failed despite the link being up.
             {
                 esp_netif_t *ppp_netif = PPP.netif();
-                if (ppp_netif != NULL) {
+                esp_netif_t *eth_netif = ETH.netif();
+                if (ppp_netif != NULL && eth_netif != NULL) {
                     esp_err_t rerr = esp_netif_set_default_netif(ppp_netif);
                     Serial.printf("[Route] Set PPP as default netif: %s\n",
                                   rerr == ESP_OK ? "OK" : "FAILED");
-                } else {
-                    Serial.println("[Route] Error: PPP netif handle is NULL!");
-                }
-            }
-
-            // Enable NAPT on the Ethernet interface to share the PPP internet to LAN
-            {
-                esp_netif_t *eth_netif = ETH.netif();
-                if (eth_netif != NULL) {
+                    
+                    // Enable NAPT on the LAN (Ethernet) interface to share the PPP internet to LAN
                     esp_err_t err = esp_netif_napt_enable(eth_netif);
                     if (err == ESP_OK) {
                         Serial.println("[NAT] NAPT successfully enabled on Ethernet interface!");
@@ -213,7 +207,7 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info) {
                         Serial.printf("[NAT] Failed to enable NAPT: %d\n", err);
                     }
                 } else {
-                    Serial.println("[NAT] Error: Ethernet netif handle is NULL!");
+                    Serial.println("[Route/NAT] Error: PPP or Ethernet netif handle is NULL!");
                 }
             }
             
@@ -405,6 +399,8 @@ void diagnose_modem() {
     Serial.println("---------------------------------------");
 }
 
+#include <lwip/opt.h>
+
 void setup() {
     Serial.begin(115200);
     Serial.setDebugOutput(true);
@@ -412,6 +408,16 @@ void setup() {
     Serial.println("============================================");
     Serial.println("   ESP32 4G/LTE to Ethernet NAT Router      ");
     Serial.println("============================================");
+    
+#ifndef IP_FORWARD
+#define IP_FORWARD -1
+#endif
+#ifndef IP_NAPT
+#define IP_NAPT -1
+#endif
+    Serial.printf("[LwIP] IP_FORWARD compile-time macro: %d\n", IP_FORWARD);
+    Serial.printf("[LwIP] IP_NAPT compile-time macro: %d\n", IP_NAPT);
+
 
     // Register Network Events Listener
     Network.onEvent(onEvent);
